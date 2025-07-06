@@ -79,47 +79,47 @@ void taskB(void *parameter) {
 }
 
 void taskC(void *parameter) {
-    adc_select_input(ADC_X);
-    uint16_t valor_x = adc_read();
-    adc_select_input(ADC_Y);
-    uint16_t valor_y = adc_read();
+    const TickType_t delay_ms = pdMS_TO_TICKS(100); // Delay entre leituras
+    const TickType_t total_time = pdMS_TO_TICKS(5000); // Tempo total de 5 segundos
+    TickType_t start_time = xTaskGetTickCount();
 
-    float tensao_x = (valor_x * 3.3) / 4095;
-    float tensao_y = (valor_y * 3.3) / 4095;
+    while ((xTaskGetTickCount() - start_time) < total_time) {
+        adc_select_input(ADC_X);
+        uint16_t valor_x = adc_read();
+        adc_select_input(ADC_Y);
+        uint16_t valor_y = adc_read();
 
+        float tensao_x = (valor_x * 3.3f) / 4095;
+        float tensao_y = (valor_y * 3.3f) / 4095;
 
+        printf("Joystick X: %.2f V, Valor: %d\n", tensao_x, valor_x);
+        printf("Joystick Y: %.2f V, Valor: %d\n", tensao_y, valor_y);
 
-    printf("Joystick X: %.2f V, Valor recebido: %d V\n", tensao_x, valor_x);
+        if ((tensao_x > 3.0f) || (tensao_y > 3.0f)) {
+            play_buzzer(true);
+        } else {
+            play_buzzer(false);
+        }
 
-    printf("Joystick Y: %.2f V, Valor recebido: %d V\n", tensao_y, valor_y);
-    
-    if ((tensao_x > 3.0) || (tensao_y > 3.0)) {
-        play_buzzer(true);
-    } else {
-        play_buzzer(false);
+        vTaskDelay(delay_ms);
     }
 
-    vTaskDelay(pdMS_TO_TICKS(100));
+    stop_buzzer(); // Garante que o buzzer pare ao final da tarefa
 
-    xTaskNotifyGive(managerTaskHandle);
-    vTaskDelete(NULL);
+    xTaskNotifyGive(managerTaskHandle); // Notifica que terminou
+    vTaskDelete(NULL); // Encerra a tarefa
 }
 
 void managerTask(void *parameter) {
-    for (;;) {
-        xTaskCreate(taskA, "TaskA", 2048, NULL, 1, &taskAHandle);
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    xTaskCreate(taskA, "TaskA", 2048, NULL, 1, &taskAHandle);
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
+    for (;;) {
         xTaskCreate(taskB, "TaskB", 1024, NULL, 1, &taskBHandle);
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
         xTaskCreate(taskC, "TaskC", 1024, NULL, 1, &taskCHandle);
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        while (1) {
-            xTaskCreate(taskC, "TaskC", 1024, NULL, 1, &taskCHandle);
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        }
     }
 }
 
